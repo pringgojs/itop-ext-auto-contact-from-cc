@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension id="auto-contact-from-cc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="file://../conf/extensions-schema.xsd">
+  <extension_code>auto-contact-from-cc</extension_code>
+  <label>Auto Contact From CC</label>
+  <version>1.0.0</version>
+  <author>YourName</author>
+  <description>
+    Tambahan untuk Mail to Ticket Automation: otomatis membuat Person dari CC email dan menambahkannya ke Contact List tiket.
+  </description>
+  <requirements>
+    <itop_version_min>3.0.0</itop_version_min>
+    <itop_version_max>3.1.x</itop_version_max>
+    <dependencies>
+      <dependency>combodo-email-synchro</dependency>
+    </dependencies>
+  </requirements>
+  <datamodel>
+    <file>model.auto-contact-from-cc.php</file>
+  </datamodel>
+</extension>
