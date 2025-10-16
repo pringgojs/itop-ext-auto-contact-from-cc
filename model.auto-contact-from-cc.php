@@ -6,6 +6,30 @@ if (!class_exists('AutoContactFromCCExtension'))
 {
     class AutoContactFromCCExtension implements iApplicationObjectExtension
     {
+        // Centralized logging: prefer IssueLog but always append to a file for debugging
+        protected function LogMessage($sLevel, $sMessage)
+        {
+            // Try the iTop logging API first (best-effort)
+            try {
+                if (strtoupper($sLevel) === 'INFO') {
+                    IssueLog::Info($sMessage);
+                } else {
+                    IssueLog::Trace($sMessage);
+                }
+            } catch (Exception $e) {
+                // ignore
+            }
+
+            // Always append to a dedicated debug log in APPROOT/log so it's easy to find
+            try {
+                $sLogDir = defined('APPROOT') ? APPROOT . 'log' . DIRECTORY_SEPARATOR : __DIR__ . DIRECTORY_SEPARATOR;
+                $sLogFile = $sLogDir . 'auto-contact-from-cc.log';
+                $sLine = date('Y-m-d H:i:s') . " [" . strtoupper($sLevel) . "] " . $sMessage . PHP_EOL;
+                file_put_contents($sLogFile, $sLine, FILE_APPEND | LOCK_EX);
+            } catch (Exception $e) {
+                // ignore file logging failures
+            }
+        }
         public function OnDBInsert($oObject, $oContextArgs = array())
         {
             // Trigger hanya untuk tiket (UserRequest & Incident)
@@ -77,11 +101,7 @@ if (!class_exists('AutoContactFromCCExtension'))
                 if ($sCcLine === '') continue;
 
                 // Log that we started processing a Cc header for this ticket
-                try {
-                    IssueLog::Trace("AutoContactFromCC: Processing Cc for ticket " . $oTicket->GetKey() . " -> {$sCcLine}");
-                } catch (Exception $e) {
-                    // best-effort logging, ignore failures
-                }
+                $this->LogMessage('trace', "AutoContactFromCC: Processing Cc for ticket " . $oTicket->GetKey() . " -> {$sCcLine}");
 
                 // Prefer imap_rfc822_parse_adrlist when available
                 $aEmails = array();
@@ -93,9 +113,7 @@ if (!class_exists('AutoContactFromCCExtension'))
                         if (!empty($oEmail->host))
                         {
                             $sEmail = strtolower(trim($oEmail->mailbox.'@'.$oEmail->host));
-                            try {
-                                IssueLog::Trace("AutoContactFromCC: Found CC email {$sEmail} for ticket " . $oTicket->GetKey());
-                            } catch (Exception $e) {}
+                            $this->LogMessage('trace', "AutoContactFromCC: Found CC email {$sEmail} for ticket " . $oTicket->GetKey());
                             $this->AttachContact($oTicket, $sEmail);
                         }
                     }
@@ -107,7 +125,7 @@ if (!class_exists('AutoContactFromCCExtension'))
                     {
                         foreach ($m[0] as $sEmail)
                         {
-                            try { IssueLog::Trace("AutoContactFromCC: Found CC email {$sEmail} (fallback regex) for ticket " . $oTicket->GetKey()); } catch (Exception $e) {}
+                            $this->LogMessage('trace', "AutoContactFromCC: Found CC email {$sEmail} (fallback regex) for ticket " . $oTicket->GetKey());
                             $this->AttachContact($oTicket, strtolower(trim($sEmail)));
                         }
                     }
@@ -135,11 +153,11 @@ if (!class_exists('AutoContactFromCCExtension'))
                 $oPerson->Set('name', $sName);
                 $oPerson->Set('email', $sEmail);
                 $oPerson->DBInsert();
-                try { IssueLog::Info("AutoContactFromCC: Created Person '" . $oPerson->GetKey() . "' for email {$sEmail}"); } catch (Exception $e) {}
+                $this->LogMessage('info', "AutoContactFromCC: Created Person '" . $oPerson->GetKey() . "' for email {$sEmail}");
             }
             else {
                 $oPerson = $oSet->Fetch();
-                try { IssueLog::Trace("AutoContactFromCC: Reusing existing Person '" . $oPerson->GetKey() . "' for email {$sEmail}"); } catch (Exception $e) {}
+                $this->LogMessage('trace', "AutoContactFromCC: Reusing existing Person '" . $oPerson->GetKey() . "' for email {$sEmail}");
             }
 
             // Tambahkan ke Contact List jika belum ada
@@ -169,10 +187,16 @@ if (!class_exists('AutoContactFromCCExtension'))
                     $oLink->Set('contact_name', $oPerson->Get('name'));
                 }
                 $oLink->DBInsert();
-                try { IssueLog::Info("AutoContactFromCC: Created lnkContactToTicket link ticket=" . $oTicket->GetKey() . " contact=" . $oPerson->GetKey()); } catch (Exception $e) {}
+                $this->LogMessage('info', "AutoContactFromCC: Created lnkContactToTicket link ticket=" . $oTicket->GetKey() . " contact=" . $oPerson->GetKey());
             }
         }
     }
 
     MetaModel::Init_AddExtension('AutoContactFromCCExtension');
+    // Write an init line so the dedicated log file is present and easy to find
+    try {
+        $sLogDir = defined('APPROOT') ? APPROOT . 'log' . DIRECTORY_SEPARATOR : __DIR__ . DIRECTORY_SEPARATOR;
+        $sLogFile = $sLogDir . 'auto-contact-from-cc.log';
+        file_put_contents($sLogFile, date('Y-m-d H:i:s') . " [INFO] AutoContactFromCCExtension initialized" . PHP_EOL, FILE_APPEND | LOCK_EX);
+    } catch (Exception $e) {}
 }
