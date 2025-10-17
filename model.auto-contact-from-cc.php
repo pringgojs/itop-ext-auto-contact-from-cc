@@ -1,4 +1,9 @@
 <?php
+
+// Force create log file untuk testing
+$sLogFile = APPROOT . 'log/auto-contact-from-cc.log';
+@file_put_contents($sLogFile, date('Y-m-d H:i:s') . " [TEST] File loaded!" . PHP_EOL, FILE_APPEND);
+
 // iTop Extension: Auto create contact from CC in Mail to Ticket Automation
 // Compatible with iTop 3.1 - FIXED VERSION
 
